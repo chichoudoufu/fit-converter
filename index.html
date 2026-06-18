@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyWhoosh → Garmin Edge 1000 FIT変換ツール</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f5f0;
+    color: #1a1a1a;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    border: 0.5px solid #e0e0d8;
+    padding: 2rem;
+    max-width: 520px;
+    width: 100%;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .header { display: flex; align-items: center; gap: 12px; margin-bottom: 1.5rem; }
+  .header-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: #e8f0fe; display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+  }
+  h1 { font-size: 16px; font-weight: 600; color: #1a1a1a; }
+  .subtitle { font-size: 13px; color: #666; margin-top: 2px; }
+
+  /* Steps */
+  .steps { display: flex; align-items: center; margin-bottom: 1.5rem; }
+  .step { flex: 1; text-align: center; position: relative; }
+  .step-line { flex: 0.5; height: 1px; background: #e0e0d8; margin-top: -16px; }
+  .step-circle {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600; margin: 0 auto 4px;
+    background: #e0e0d8; color: #aaa; transition: all 0.3s;
+  }
+  .step.active .step-circle { background: #1c63b7; color: #fff; }
+  .step.done .step-circle { background: #16a34a; color: #fff; }
+  .step-label { font-size: 11px; color: #888; }
+  .step.active .step-label { color: #1c63b7; font-weight: 500; }
+  .step.done .step-label { color: #16a34a; }
+
+  /* Dropzone */
+  #dropzone {
+    border: 1.5px dashed #ccc; border-radius: 12px;
+    padding: 2.5rem 1.5rem; text-align: center;
+    cursor: pointer; transition: background 0.15s, border-color 0.15s;
+    margin-bottom: 1.25rem;
+  }
+  #dropzone:hover, #dropzone.drag-over { background: #f8f8f5; border-color: #999; }
+  .drop-icon { font-size: 40px; margin-bottom: 0.75rem; }
+  .drop-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .drop-sub { font-size: 13px; color: #888; margin-bottom: 1rem; }
+
+  /* Buttons */
+  button {
+    background: #fff; border: 0.5px solid #ccc; border-radius: 8px;
+    padding: 7px 18px; font-size: 13px; cursor: pointer;
+    transition: background 0.12s; font-family: inherit; color: #1a1a1a;
+  }
+  button:hover { background: #f5f5f0; }
+  button:active { transform: scale(0.98); }
+  .btn-primary {
+    background: #1c63b7; color: #fff; border: none;
+    padding: 10px; font-size: 14px; font-weight: 500;
+    border-radius: 8px; width: 100%;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-primary:hover { background: #1a56a0; }
+  .btn-success {
+    background: #16a34a; color: #fff; border: none;
+    border-radius: 8px; padding: 7px 16px; font-size: 13px;
+    display: flex; align-items: center; gap: 6px; white-space: nowrap;
+    cursor: pointer;
+  }
+  .btn-success:hover { background: #15803d; }
+
+  /* Status */
+  #statusArea {
+    display: none; background: #f8f8f5; border: 0.5px solid #e0e0d8;
+    border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem;
+  }
+  .status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  #statusText { font-size: 14px; font-weight: 600; }
+  #logLines { font-size: 12px; color: #888; font-family: 'SF Mono', 'Consolas', monospace; line-height: 1.8; }
+
+  /* Result */
+  #resultArea { display: none; margin-bottom: 1rem; }
+  .result-box {
+    background: #f0faf4; border: 0.5px solid #86efac;
+    border-radius: 12px; padding: 1rem 1.25rem;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .result-label { font-size: 14px; font-weight: 600; color: #16a34a; }
+  .result-name { font-size: 12px; color: #16a34a; margin-top: 2px; opacity: 0.8; }
+
+  /* Garmin */
+  #garminArea { display: none; margin-bottom: 1rem; }
+  .garmin-box {
+    background: #eff6ff; border: 0.5px solid #bfdbfe;
+    border-radius: 12px; padding: 1rem 1.25rem;
+  }
+  .garmin-hint { font-size: 13px; color: #3b82f6; margin-bottom: 0.75rem; }
+  .garmin-sub { font-size: 11px; color: #93c5fd; text-align: center; margin-top: 8px; }
+
+  /* Error */
+  #errorArea {
+    display: none; background: #fff5f5; border: 0.5px solid #fca5a5;
+    border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem;
+  }
+  .error-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .error-label { font-size: 14px; font-weight: 600; color: #dc2626; }
+  #errorText { font-size: 13px; color: #dc2626; }
+
+  .footer {
+    margin-top: 1.5rem; padding-top: 1rem;
+    border-top: 0.5px solid #e0e0d8;
+    text-align: center; font-size: 12px; color: #aaa;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="header">
+    <div class="header-icon">🚴</div>
+    <div>
+      <h1>MyWhoosh → Garmin FIT変換ツール</h1>
+      <p class="subtitle">Java不要・インストール不要 ／ Edge 1000として変換</p>
+    </div>
+  </div>
+
+  <!-- Steps -->
+  <div class="steps">
+    <div class="step active" id="step1">
+      <div class="step-circle">1</div>
+      <p class="step-label">FITをドロップ</p>
+    </div>
+    <div class="step-line"></div>
+    <div class="step" id="step2">
+      <div class="step-circle">2</div>
+      <p class="step-label">Edge 1000に変換</p>
+    </div>
+    <div class="step-line"></div>
+    <div class="step" id="step3">
+      <div class="step-circle">3</div>
+      <p class="step-label">Garminへアップ</p>
+    </div>
+  </div>
+
+  <!-- Step 1: Drop -->
+  <div id="dropzone">
+    <div class="drop-icon">📂</div>
+    <p class="drop-title">.fitファイルをここにドロップ</p>
+    <p class="drop-sub">またはクリックしてファイルを選択</p>
+    <button onclick="document.getElementById('fileInput').click()">ファイルを選択</button>
+    <input type="file" id="fileInput" accept=".fit" style="display:none;">
+  </div>
+
+  <!-- Status log -->
+  <div id="statusArea">
+    <div class="status-row">
+      <span id="statusIcon">⚙️</span>
+      <span id="statusText">処理中...</span>
+    </div>
+    <div id="logLines"></div>
+  </div>
+
+  <!-- Step 2: Download -->
+  <div id="resultArea">
+    <div class="result-box">
+      <span style="font-size:22px;">✅</span>
+      <div style="flex:1;">
+        <p class="result-label">変換完了！まずダウンロード</p>
+        <p class="result-name" id="resultFilename"></p>
+      </div>
+      <button class="btn-success" id="downloadBtn">⬇ ダウンロード</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Garmin Connect -->
+  <div id="garminArea">
+    <div class="garmin-box">
+      <p class="garmin-hint">📌 ダウンロード後、Garmin Connectのアップロード画面でインポートしてください</p>
+      <button class="btn-primary" id="garminBtn">
+        🔗 Garmin Connect アップロード画面を開く
+      </button>
+      <p class="garmin-sub">開いたページの右上「インポート」からダウンロードしたファイルを選択してください</p>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div id="errorArea">
+    <div class="error-row">
+      <span>❌</span>
+      <span class="error-label">エラー</span>
+    </div>
+    <p id="errorText"></p>
+  </div>
+
+  <div class="footer">🔒 ファイルはブラウザ内のみで処理されます。サーバーへのアップロードは一切ありません</div>
+</div>
+
+<script>
+(function(){
+  function log(msg){document.getElementById('logLines').innerHTML+=msg+'<br>';}
+
+  function setStep(n){
+    [1,2,3].forEach(i=>{
+      const el=document.getElementById('step'+i);
+      const c=el.querySelector('.step-circle');
+      el.className='step';
+      if(i<n){el.classList.add('done');c.textContent='✓';}
+      else if(i===n){el.classList.add('active');c.textContent=i;}
+      else{c.textContent=i;}
+    });
+  }
+
+  function showStatus(icon,text){
+    document.getElementById('statusArea').style.display='block';
+    document.getElementById('statusIcon').textContent=icon;
+    document.getElementById('statusText').textContent=text;
+  }
+  function showError(msg){
+    document.getElementById('errorArea').style.display='block';
+    document.getElementById('errorText').textContent=msg;
+  }
+  function resetUI(){
+    ['statusArea','resultArea','garminArea','errorArea'].forEach(id=>{
+      document.getElementById(id).style.display='none';
+    });
+    document.getElementById('logLines').innerHTML='';
+    setStep(1);
+  }
+
+  const dz=document.getElementById('dropzone');
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
+  dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
+  dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f)processFile(f);});
+  document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0])processFile(e.target.files[0]);});
+  document.getElementById('garminBtn').onclick=()=>window.open('https://connect.garmin.com/modern/import-data','_blank');
+
+  function processFile(file){
+    if(!file.name.toLowerCase().endsWith('.fit')){resetUI();showError('FITファイル（.fit）のみ対応しています');return;}
+    resetUI();
+    setStep(2);
+    showStatus('⚙️','FITファイルを読み込み中...');
+    log('ファイル: '+file.name+' ('+Math.round(file.size/1024)+'KB)');
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        const buf=new Uint8Array(e.target.result);
+        const result=convertFit(buf,file.name);
+        if(result.success){
+          showStatus('✅','変換完了');
+          const blob=new Blob([result.data],{type:'application/octet-stream'});
+          const url=URL.createObjectURL(blob);
+          document.getElementById('resultArea').style.display='block';
+          document.getElementById('resultFilename').textContent=result.outName;
+          document.getElementById('downloadBtn').onclick=()=>{
+            const a=document.createElement('a');a.href=url;a.download=result.outName;a.click();
+            setTimeout(()=>{setStep(3);document.getElementById('garminArea').style.display='block';},600);
+          };
+        } else {
+          setStep(1);showStatus('❌','変換失敗');showError(result.error);
+        }
+      } catch(err){
+        setStep(1);showStatus('❌','エラー');showError('処理中にエラーが発生しました: '+err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function rU16(b,o){return b[o]|(b[o+1]<<8);}
+  function rU32(b,o){return(b[o]|(b[o+1]<<8)|(b[o+2]<<16)|(b[o+3]<<24))>>>0;}
+  function wU16(b,o,v){b[o]=v&0xFF;b[o+1]=(v>>8)&0xFF;}
+
+  function convertFit(buf,fname){
+    if(buf.length<14)return{success:false,error:'ファイルが短すぎます'};
+    const magic=String.fromCharCode(buf[8],buf[9],buf[10],buf[11]);
+    if(magic!=='.FIT')return{success:false,error:'FITファイルではありません (magic="'+magic+'")'};
+    const out=new Uint8Array(buf);
+    const headerSize=buf[0];
+    const dataSize=rU32(buf,4);
+    const end=headerSize+dataSize;
+    log('解析開始 ('+dataSize+'bytes)');
+    let pos=headerSize;
+    const defs={};
+    while(pos<end-1){
+      const rh=buf[pos];
+      if((rh&0x80)!==0){pos++;continue;}
+      const isDef=(rh&0x40)!==0;
+      const hasDev=(rh&0x20)!==0;
+      const lt=rh&0x0F;
+      if(isDef){
+        pos++;pos++;
+        const arch=buf[pos++];
+        const gmn=arch===0?rU16(buf,pos):(buf[pos]|(buf[pos+1]<<8));
+        pos+=2;
+        const nf=buf[pos++];
+        const fds=[];
+        for(let i=0;i<nf;i++){if(pos+2>=end)break;fds.push({fn:buf[pos++],sz:buf[pos++],bt:buf[pos++]});}
+        if(hasDev&&pos<end){const nd=buf[pos++];for(let i=0;i<nd&&pos+2<end;i++)pos+=3;}
+        defs[lt]={gmn,arch,fds};
+      } else {
+        pos++;
+        const def=defs[lt];
+        if(!def)break;
+        if(def.gmn===0){
+          let off=0;
+          for(const fd of def.fds){
+            const abs=pos+off;
+            if(fd.fn===1&&fd.sz===2&&abs+1<end){const old=def.arch===0?rU16(out,abs):(out[abs]|(out[abs+1]<<8));wU16(out,abs,1);log('manufacturer: '+old+' → 1 (Garmin)');}
+            if(fd.fn===2&&fd.sz===2&&abs+1<end){const old=def.arch===0?rU16(out,abs):(out[abs]|(out[abs+1]<<8));wU16(out,abs,1836);log('product: '+old+' → 1836 (Edge 1000)');}
+            off+=fd.sz;
+          }
+        }
+        for(const fd of def.fds)pos+=fd.sz;
+      }
+    }
+    if(out.length>=end+2){
+      const crc=calcCrc(out.slice(0,end));
+      out[end]=crc&0xFF;out[end+1]=(crc>>8)&0xFF;
+      log('CRC更新完了');
+    }
+    return{success:true,data:out,outName:fname.replace(/\.fit$/i,'')+'_edge1000.fit'};
+  }
+
+  function calcCrc(data){
+    const t=[0x0000,0xCC01,0xD801,0x1400,0xF001,0x3C00,0x2800,0xE401,0xA001,0x6C00,0x7800,0xB401,0x5000,0x9C01,0x8801,0x4400];
+    let c=0;
+    for(let i=0;i<data.length;i++){
+      const b=data[i];
+      let tmp=t[c&0xF];c=(c>>4)&0xFFF;c=c^tmp^t[b&0xF];
+      tmp=t[c&0xF];c=(c>>4)&0xFFF;c=c^tmp^t[(b>>4)&0xF];
+    }
+    return c;
+  }
+})();
+</script>
+</body>
+</html>
